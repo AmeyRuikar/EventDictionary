@@ -2,6 +2,7 @@ package alexa.ticketmaster;
 
 import java.net.URL;
 import java.net.URLEncoder;
+import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -216,7 +217,13 @@ public class Ticketmaster {
 		}
 		return false;
 	}
-
+	private String getTime(String e) {
+		String s = "";
+		s = e.replaceAll("T", " ");
+		s = s.replaceAll("Z", ".0");
+		return s;
+		
+	}
 	private ArrayList<EventsEntity> parseJsonObj(JSONObject mainJsonObj) throws Exception {
 		ArrayList<EventsEntity> eventsArrList = new ArrayList<EventsEntity>();
 		
@@ -224,11 +231,15 @@ public class Ticketmaster {
 		JSONArray jsonArray = _embeddedObj.getJSONArray("events");
 
 		for (int i = 0; i < jsonArray.length(); i++) {
-			String latitude = "", longitude = "", genre = "", subGenre = "", genre1 = "", genre2 = "", saleStartTime = "", saleEndTime = "";
+			String genre = "", subGenre = "", genre1 = "", genre2 = "";
+			double latitude = 0.0, longitude = 0.0;
+			Timestamp saleStartTime = null, saleEndTime = null;
 			JSONObject jsonEventObject = jsonArray.getJSONObject(i);
 			String eventName = jsonEventObject.getString("name");
-			String eventTime = (jsonEventObject.getJSONObject("dates")).getJSONObject("start").getString("localTime"); 
-			String eventDate = (jsonEventObject.getJSONObject("dates")).getJSONObject("start").getString("localDate");
+			String e1 = (jsonEventObject.getJSONObject("dates")).getJSONObject("start").getString("localTime") + ".0";
+			String e2 = (jsonEventObject.getJSONObject("dates")).getJSONObject("start").getString("localDate");
+			Timestamp eventTime = Timestamp.valueOf(e2 + " " + e1); 
+			Timestamp eventDate = Timestamp.valueOf(e2 + " " + e1);
 			String urlBooking = (jsonEventObject.getString("url"));
 			String urlImg = (jsonEventObject.getJSONArray("images")).getJSONObject(0).getString("url");
 			if((jsonEventObject.has("classifications"))) {
@@ -251,14 +262,16 @@ public class Ticketmaster {
 			if(sales.has("public")) {
 			JSONObject publicObj = sales.getJSONObject("public");
 			if(publicObj.has("startDateTime")) {
-			saleStartTime = publicObj.getString("startDateTime");
+			String e = getTime(publicObj.getString("startDateTime"));
+			saleStartTime = Timestamp.valueOf(e);
 			}
 			if(publicObj.has("endDateTime")) {
-			saleEndTime = publicObj.getString("endDateTime");
+			String e = getTime(publicObj.getString("endDateTime"));
+			saleEndTime = Timestamp.valueOf(e);
 			} 
 			}
 			}
-			String rating = "0";
+			double rating = 0.0;
 			if (addToEventsList(eventName)) {
 				// event description
 				String eventDesc = getEventDescription(eventName, jsonEventObject);
@@ -267,14 +280,16 @@ public class Ticketmaster {
 				// latitude
 				JSONArray addrArray = jsonEventObject.getJSONObject("_embedded").getJSONArray("venues");
 				// get the first venue at 0th index
-				latitude = getLatitude(addrArray.getJSONObject(0));
-				longitude = getLongitude(addrArray.getJSONObject(0));
+				String lat = getLatitude(addrArray.getJSONObject(0));
+				String lng = getLongitude(addrArray.getJSONObject(0));
+				latitude = Double.valueOf(lat!=""?lat:"0.0");
+				longitude = Double.valueOf(lng!=""?lng:"0.0");
 				String eventAddress = getEventAddress(addrArray.getJSONObject(0));
-				if((latitude == "" || longitude == "") && eventAddress.trim() != "") {
+				if((latitude == 0.0 || longitude == 0.0) && eventAddress.trim() != "") {
 				JSONObject loc = geocoding(eventAddress);
 				if(loc != null) {
-				latitude = String.valueOf(loc.getDouble("lat"));
-				longitude = String.valueOf(loc.getDouble("lng"));
+				latitude = loc.getDouble("lat");
+				longitude = loc.getDouble("lng");
 				}
 				}
 				EventsEntity eventDetails = new EventsEntity(parseString(eventName), eventDesc, eventTime, eventDate, 
